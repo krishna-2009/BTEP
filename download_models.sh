@@ -78,5 +78,5 @@ models=(
 
 # Loop through the list and download each model
 for model in "${models[@]}"; do
-    !mim download mmrotate --config $model --dest .
+    mim download mmrotate --config $model --dest .
 done
