@@ -67,10 +67,16 @@ class ModelEvaluator:
         
         # Run inference using the demo command and capture the output
         command = f"python demo/image_demo.py {image_path} {config_file} {checkpoint_file} --out-file {output_file}"
-        result = subprocess.check_output(command, shell=True)
-        
-        # Parse the result
-        result = json.loads(result.decode('utf-8'))
+        try:
+            result = subprocess.check_output(command, shell=True)
+            # Parse the result
+            result = json.loads(result.decode('utf-8'))
+        except subprocess.CalledProcessError as e:
+            print(f"Error running command for {config_file}: {str(e)}")
+            return None
+        except json.JSONDecodeError:
+            print(f"Error parsing JSON output for {config_file}")
+            return None
         
         # Get model name from config
         model_name = os.path.splitext(os.path.basename(config_file))[0]
@@ -80,13 +86,10 @@ class ModelEvaluator:
         confidence_scores = []
         
         # Handle different result formats
-        if isinstance(result, tuple):
-            result = result[0]  # Some models return tuple of (bbox_results, mask_results)
-        
         for class_results in result:
             if len(class_results) > 0:
                 total_detections += len(class_results)
-                confidence_scores.extend(class_results[:, -1])
+                confidence_scores.extend([res[-1] for res in class_results])
         
         # Store results
         self.results[model_name] = {
@@ -136,7 +139,10 @@ def main():
             results = evaluator.evaluate_model(model['config'], 
                                             model['checkpoint'], 
                                             image_path)
-            print(f"Detected {results['total_detections']} objects with average confidence {results['avg_confidence']:.3f}")
+            if results:
+                print(f"Detected {results['total_detections']} objects with average confidence {results['avg_confidence']:.3f}")
+            else:
+                print(f"No results for {model['config']}")
         except Exception as e:
             print(f"Error processing {model['config']}: {str(e)}")
     
